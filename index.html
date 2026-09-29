@@ -33,8 +33,8 @@ button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;pa
     <div>
       <span class="eyebrow">🔥 START 01/10/2026 • THỨ NĂM</span>
       <h2>6:00 sáng có mặt.<br/>3 buổi mỗi tuần. Không viện lý do.</h2>
-      <p>Dashboard theo dõi điểm danh, mức độ hoàn thành, tiền phạt và quỹ ăn chơi của Ánh • Hằng • Uyên. Dữ liệu được lưu trực tiếp trên trình duyệt này.</p>
-      <div class="notice" id="preStartNotice"></div>
+      <p>Dashboard theo dõi điểm danh, mức độ hoàn thành, tiền phạt và quỹ ăn chơi của Ánh • Hằng • Uyên. Dữ liệu được đồng bộ công khai giữa các thiết bị qua Google Sheets API.</p>
+      <div class="notice" id="preStartNotice"></div><div style="margin-top:12px"><span class="badge neutral" id="syncBadge">☁️ Chưa đồng bộ</span></div>
     </div>
     <div class="hero-side">
       <div class="rule"><b>⏰ Mốc chuẩn</b><span>Điểm danh 06:00, Thứ 2–Thứ 6</span></div>
@@ -156,10 +156,10 @@ button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;pa
           </div>
         </div>
         <div class="card">
-          <div class="section-head"><div><h3>Dữ liệu & backup</h3><p>Bản này lưu bằng LocalStorage nên nên backup định kỳ.</p></div></div>
-          <div class="actions"><button class="btn btn-secondary" id="btnExport">Xuất backup JSON</button><label class="btn btn-secondary" style="cursor:pointer">Nhập backup JSON<input id="importFile" type="file" accept="application/json" hidden></label><button class="btn btn-danger" id="btnReset">Xóa toàn bộ dữ liệu</button></div>
+          <div class="section-head"><div><h3>Dữ liệu & đồng bộ</h3><p>Dữ liệu dùng chung được lưu trên Google Sheets qua Apps Script API.</p></div></div>
+          <div class="actions"><button class="btn btn-secondary" id="btnExport">Xuất backup JSON</button><button class="btn btn-danger" id="btnReset">Xóa toàn bộ dữ liệu</button></div>
           <div style="height:12px"></div>
-          <div class="callout"><strong>Lưu ý kỹ thuật:</strong> LocalStorage chỉ đồng bộ trên cùng một trình duyệt/thiết bị. Nếu cả Ánh, Hằng, Uyên cần tự điểm danh từ 3 điện thoại khác nhau, nên nâng cấp sang backend dùng Supabase/Firebase/Google Sheet API.</div>
+          <div class="callout"><strong>Đồng bộ đa thiết bị:</strong> Ánh, Hằng và Uyên có thể mở cùng website trên các thiết bị khác nhau. Dashboard tự tải lại dữ liệu mỗi 30 giây và khi quay lại tab. <strong>Lưu ý:</strong> token API nằm trong mã nguồn front-end nên chỉ nên xem như khóa chống nhập nhầm, không phải khóa bảo mật bí mật.</div>
         </div>
       </div>
     </section>
@@ -167,76 +167,588 @@ button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;pa
   <div class="footer">Về đích Bính Ngọ • dữ liệu thuộc về nhóm • build 2026</div>
 </div>
 <script>
-const STORAGE_KEY='ve_dich_binh_ngo_v1';
-const DEFAULT_STATE={
-  config:{projectName:'Về đích Bính Ngọ',startDate:'2026-10-01',checkinTime:'06:00',graceMinutes:5,targetPerWeek:3,fineAmount:50000,exemptShortFirstWeek:true,members:['Ánh','Hằng','Uyên']},
-  checkins:[], payments:{}, transactions:[]
-};
-let state=loadState();
-function clone(o){return JSON.parse(JSON.stringify(o))}
-function loadState(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return clone(DEFAULT_STATE);const s=JSON.parse(raw);return {...clone(DEFAULT_STATE),...s,config:{...clone(DEFAULT_STATE).config,...(s.config||{})}}}catch(e){return clone(DEFAULT_STATE)}}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));renderAll()}
-const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
-function pad(n){return String(n).padStart(2,'0')}
-function localDateStr(d=new Date()){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
-function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12,0,0,0)}
-function fmtDate(s){const d=parseDate(s);return d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}
-function fmtShort(s){const d=parseDate(s);return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`}
-function money(n){return new Intl.NumberFormat('vi-VN').format(Math.round(n||0))+'đ'}
-function addDays(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDateStr(d)}
-function startOfWeek(s){const d=parseDate(s);const day=d.getDay();const diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return localDateStr(d)}
-function endOfWeek(s){return addDays(startOfWeek(s),6)}
-function minuteOf(t){const [h,m]=t.split(':').map(Number);return h*60+m}
-function deadlineMinutes(){return minuteOf(state.config.checkinTime)+Number(state.config.graceMinutes||0)}
-function isWeekday(s){const d=parseDate(s).getDay();return d>=1&&d<=5}
-function isProgramDay(s){return s>=state.config.startDate&&isWeekday(s)}
-function eligibleDaysInWeek(weekStart){return [0,1,2,3,4].map(i=>addDays(weekStart,i)).filter(isProgramDay)}
-function isFirstProgramWeek(weekStart){return weekStart===startOfWeek(state.config.startDate)}
-function isWeekExempt(weekStart){return !!state.config.exemptShortFirstWeek && isFirstProgramWeek(weekStart) && eligibleDaysInWeek(weekStart).length<state.config.targetPerWeek}
-function isWeekCompleted(weekStart, today=localDateStr()){return endOfWeek(weekStart)<today}
-function validCheckin(ci){return isProgramDay(ci.date)&&minuteOf(ci.time)<=deadlineMinutes()}
-function getWeekCheckins(member,weekStart){const end=endOfWeek(weekStart);return state.checkins.filter(c=>c.member===member&&c.date>=weekStart&&c.date<=end)}
-function memberWeek(member,weekStart){const arr=getWeekCheckins(member,weekStart);const valid=arr.filter(validCheckin).length;const late=arr.filter(c=>isProgramDay(c.date)&&!validCheckin(c)).length;const exempt=isWeekExempt(weekStart);const shortage=Math.max(0,state.config.targetPerWeek-valid);const completed=isWeekCompleted(weekStart);const fine=(!exempt&&completed&&shortage>0)?state.config.fineAmount:0;return {valid,late,shortage,exempt,completed,fine}}
-function paymentKey(weekStart,member){return `${weekStart}__${member}`}
-function allCompletedWeekStarts(){const today=localDateStr();let w=startOfWeek(state.config.startDate);const out=[];let guard=0;while(endOfWeek(w)<today&&guard<520){out.push(w);w=addDays(w,7);guard++}return out}
-function allFines(){const rows=[];for(const w of allCompletedWeekStarts()){for(const m of state.config.members){const st=memberWeek(m,w);if(st.fine>0){const key=paymentKey(w,m);rows.push({weekStart:w,member:m,amount:st.fine,paid:!!state.payments[key]?.paid,paidAt:state.payments[key]?.paidAt||null,key})}}}return rows}
-function finance(){const fines=allFines();const finePaid=fines.filter(x=>x.paid).reduce((s,x)=>s+x.amount,0);const receivable=fines.filter(x=>!x.paid).reduce((s,x)=>s+x.amount,0);const contrib=state.transactions.filter(t=>t.type==='contribution').reduce((s,t)=>s+Number(t.amount||0),0);const spent=state.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount||0),0);return {finePaid,receivable,contrib,spent,balance:finePaid+contrib-spent}}
-function currentWeek(){return startOfWeek(localDateStr())}
-function setTodayInputs(){const now=new Date();$('#ciDate').value=localDateStr(now);$('#ciTime').value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;$('#txDate').value=localDateStr(now);$('#reportDate').value=localDateStr(now)}
+const API_URL = 'https://script.google.com/macros/s/AKfycbwPdsx1G1BqPJOuOvHhW6M34rOQR9-NzW3T_1KyGYf4lX2rUfd546vbsbCsf37Nz1cFCg/exec';
+const API_TOKEN = '011026.gs';
+const MEMBERS = ['Ánh', 'Hằng', 'Uyên'];
 
-function renderHeader(){const now=new Date();$('#liveTime').textContent=now.toLocaleTimeString('vi-VN',{hour12:false});$('#liveDate').textContent=now.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});const today=localDateStr(now);const n=$('#preStartNotice');if(today<state.config.startDate){const diff=Math.ceil((parseDate(state.config.startDate)-parseDate(today))/86400000);n.className='notice show';n.innerHTML=`Chương trình chưa bắt đầu. Còn <b>${diff} ngày</b> tới ${fmtDate(state.config.startDate)}.`}else{n.className='notice'}}
-function renderMemberSelects(){const opts=state.config.members.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');$('#ciMember').innerHTML=opts;$('#txMember').innerHTML='<option value="">— Nhóm —</option>'+opts}
-function renderOverview(){
-  const f=finance();$('#kpiFund').textContent=money(f.balance);$('#kpiReceivable').textContent=money(f.receivable);$('#kpiReceivableFoot').textContent=`${allFines().filter(x=>!x.paid).length} khoản chưa nộp`;
-  const w=currentWeek(),stats=state.config.members.map(m=>({m,...memberWeek(m,w)}));const hit=stats.filter(x=>x.valid>=state.config.targetPerWeek).length;const total=stats.reduce((s,x)=>s+x.valid,0);$('#kpiHitRate').textContent=Math.round(hit/state.config.members.length*100)+'%';$('#kpiHitRateFoot').textContent=`${hit}/${state.config.members.length} thành viên đang đạt`;$('#kpiSessions').textContent=total;$('#currentWeekLabel').textContent=`${fmtDate(w)} → ${fmtDate(endOfWeek(w))}`;
-  const exempt=isWeekExempt(w);$('#weekStateBadge').textContent=exempt?'Tuần khởi động • miễn phạt':(isWeekCompleted(w)?'Đã chốt':'Đang theo dõi');$('#weekStateBadge').className='badge '+(exempt?'neutral':'neutral');
-  $('#memberCards').innerHTML=stats.map(x=>{const pct=Math.min(100,Math.round(x.valid/state.config.targetPerWeek*100));const status=x.valid>=state.config.targetPerWeek?'Đã đạt':`${x.valid}/${state.config.targetPerWeek} buổi`;return `<div class="card member"><div class="member-top"><div style="display:flex;align-items:center;gap:10px"><div class="avatar">${esc(x.m.charAt(0))}</div><div><b>${esc(x.m)}</b><div class="mini">${x.late} buổi muộn</div></div></div><span class="status-pill">${status}</span></div><div class="progress"><span style="width:${pct}%"></span></div><div class="member-stats"><span>${x.valid} buổi hợp lệ</span><span>${pct}%</span></div></div>`}).join('');
+const DEFAULT_SETTINGS = {
+  startDate: '2026-10-01',
+  deadline: '06:00',
+  grace: 5,
+  minPerWeek: 3,
+  fineAmount: 50000,
+  unit: 'đ',
+  waiveFirstWeek: true
+};
+
+let state = {
+  settings: { ...DEFAULT_SETTINGS },
+  checkins: [],
+  transactions: [],
+  fines: {}
+};
+
+let pendingWrites = 0;
+let lastSyncAt = null;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function setSyncStatus(status, detail = '') {
+  const el = $('#syncBadge');
+  if (!el) return;
+  if (status === 'loading') {
+    el.className = 'badge neutral';
+    el.textContent = '☁️ Đang đồng bộ…';
+  } else if (status === 'ok') {
+    el.className = 'badge ok';
+    const time = lastSyncAt ? lastSyncAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+    el.textContent = `☁️ Google Sheets${time ? ' • ' + time : ''}`;
+  } else {
+    el.className = 'badge fail';
+    el.textContent = `⚠️ Mất kết nối${detail ? ' • ' + detail : ''}`;
+  }
+}
+
+async function apiGetAll() {
+  const res = await fetch(`${API_URL}?token=${encodeURIComponent(API_TOKEN)}&t=${Date.now()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Lỗi tải dữ liệu');
+  return data;
+}
+
+// text/plain để trình duyệt không gửi CORS preflight OPTIONS tới Apps Script.
+async function apiPost(action, payload = {}) {
+  pendingWrites++;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, token: API_TOKEN, ...payload })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Lỗi ghi dữ liệu');
+    return data;
+  } finally {
+    pendingWrites--;
+  }
+}
+
+function boolValue(v) {
+  return v === true || v === 1 || String(v).toLowerCase() === 'true';
+}
+
+function hydrate(d = {}) {
+  state.checkins = Array.isArray(d.checkins) ? d.checkins.map(c => ({ ...c })) : [];
+  state.transactions = Array.isArray(d.transactions)
+    ? d.transactions.map(t => ({ ...t, amount: Number(t.amount || 0) }))
+    : [];
+
+  state.fines = {};
+  (Array.isArray(d.fines) ? d.fines : []).forEach(f => {
+    const member = f.member || '';
+    const weekStart = f.weekStart || '';
+    const key = f.key || `${member}|${weekStart}`;
+    state.fines[key] = {
+      ...f,
+      key,
+      member,
+      weekStart,
+      paid: boolValue(f.paid),
+      paidAt: f.paidAt || ''
+    };
+  });
+
+  const s = { ...DEFAULT_SETTINGS };
+  (Array.isArray(d.settings) ? d.settings : []).forEach(r => {
+    if (!r || !r.key) return;
+    try { s[r.key] = JSON.parse(r.value); }
+    catch (_) { if (r.value !== undefined && r.value !== null && r.value !== '') s[r.key] = r.value; }
+  });
+
+  // Tương thích nếu Google Sheet từng dùng tên field của bản LocalStorage cũ.
+  if (s.checkinTime !== undefined && s.deadline === DEFAULT_SETTINGS.deadline) s.deadline = s.checkinTime;
+  if (s.graceMinutes !== undefined && s.grace === DEFAULT_SETTINGS.grace) s.grace = Number(s.graceMinutes);
+  if (s.targetPerWeek !== undefined && s.minPerWeek === DEFAULT_SETTINGS.minPerWeek) s.minPerWeek = Number(s.targetPerWeek);
+  if (s.exemptShortFirstWeek !== undefined && s.waiveFirstWeek === DEFAULT_SETTINGS.waiveFirstWeek) s.waiveFirstWeek = boolValue(s.exemptShortFirstWeek);
+
+  s.grace = Number(s.grace || 0);
+  s.minPerWeek = Number(s.minPerWeek || 3);
+  s.fineAmount = Number(s.fineAmount || 0);
+  s.waiveFirstWeek = boolValue(s.waiveFirstWeek);
+  state.settings = s;
+}
+
+function isFormEditing() {
+  const tag = document.activeElement?.tagName;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
+}
+
+async function loadState(silent = false) {
+  if (silent && (pendingWrites > 0 || isFormEditing())) return;
+  try {
+    if (!silent) setSyncStatus('loading');
+    hydrate(await apiGetAll());
+    lastSyncAt = new Date();
+    renderAll();
+    setSyncStatus('ok');
+  } catch (err) {
+    setSyncStatus('error');
+    if (!silent) alert('Không tải được dữ liệu từ Google Sheets: ' + err.message);
+    console.error(err);
+  }
+}
+
+async function addCheckin({ member, date, time, proof = '', note = '' }) {
+  const rec = { id: uid(), member, date, time, proof, note, createdAt: new Date().toISOString() };
+  state.checkins.push(rec);
+  renderAll();
+  try {
+    await apiPost('addCheckin', { data: rec });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+    return rec;
+  } catch (err) {
+    state.checkins = state.checkins.filter(c => c.id !== rec.id);
+    renderAll();
+    setSyncStatus('error');
+    alert('Lưu điểm danh thất bại, vui lòng thử lại.\n' + err.message);
+    throw err;
+  }
+}
+
+// Apps Script hiện chưa có action updateCheckin, nên thay bản ghi theo cách add mới -> xóa cũ.
+// Nếu bước xóa cũ lỗi, hệ thống cố rollback bản ghi mới để tránh tạo trùng.
+async function replaceCheckin(existing, fields) {
+  const rec = { id: uid(), ...fields, createdAt: new Date().toISOString() };
+  try {
+    await apiPost('addCheckin', { data: rec });
+    try {
+      await apiPost('deleteCheckin', { id: existing.id });
+    } catch (deleteErr) {
+      try { await apiPost('deleteCheckin', { id: rec.id }); } catch (_) {}
+      throw deleteErr;
+    }
+    state.checkins = state.checkins.filter(c => c.id !== existing.id);
+    state.checkins.push(rec);
+    lastSyncAt = new Date();
+    renderAll();
+    setSyncStatus('ok');
+    return rec;
+  } catch (err) {
+    await loadState(true);
+    setSyncStatus('error');
+    alert('Không thể cập nhật lượt điểm danh. Dữ liệu đã được đồng bộ lại.\n' + err.message);
+    throw err;
+  }
+}
+
+async function deleteCheckin(id) {
+  const backup = [...state.checkins];
+  state.checkins = state.checkins.filter(c => c.id !== id);
+  renderAll();
+  try {
+    await apiPost('deleteCheckin', { id });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+  } catch (err) {
+    state.checkins = backup;
+    renderAll();
+    setSyncStatus('error');
+    alert('Xóa điểm danh thất bại.\n' + err.message);
+  }
+}
+
+async function addTransaction({ type, amount, date, member = '', note = '' }) {
+  const rec = { id: uid(), type, amount: Number(amount), date, member, note, createdAt: new Date().toISOString() };
+  state.transactions.push(rec);
+  renderAll();
+  try {
+    await apiPost('addTransaction', { data: rec });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+    return rec;
+  } catch (err) {
+    state.transactions = state.transactions.filter(t => t.id !== rec.id);
+    renderAll();
+    setSyncStatus('error');
+    alert('Lưu giao dịch thất bại.\n' + err.message);
+    throw err;
+  }
+}
+
+async function deleteTransaction(id) {
+  const backup = [...state.transactions];
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  renderAll();
+  try {
+    await apiPost('deleteTransaction', { id });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+  } catch (err) {
+    state.transactions = backup;
+    renderAll();
+    setSyncStatus('error');
+    alert('Xóa giao dịch thất bại.\n' + err.message);
+  }
+}
+
+async function setFinePaid(member, weekStart, paid) {
+  const key = `${member}|${weekStart}`;
+  const prev = state.fines[key] ? { ...state.fines[key] } : null;
+  const rec = { key, member, weekStart, paid: !!paid, paidAt: paid ? new Date().toISOString() : '' };
+  state.fines[key] = rec;
+  renderAll();
+  try {
+    await apiPost('setFine', { data: rec });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+  } catch (err) {
+    if (prev) state.fines[key] = prev;
+    else delete state.fines[key];
+    renderAll();
+    setSyncStatus('error');
+    alert('Cập nhật nộp phạt thất bại.\n' + err.message);
+  }
+}
+
+async function saveSettings(newSettings) {
+  const prev = { ...state.settings };
+  state.settings = { ...state.settings, ...newSettings };
+  renderAll();
+  try {
+    await apiPost('saveSettings', { data: state.settings });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+    return true;
+  } catch (err) {
+    state.settings = prev;
+    renderAll();
+    setSyncStatus('error');
+    alert('Lưu cài đặt thất bại.\n' + err.message);
+    return false;
+  }
+}
+
+async function clearAllData() {
+  if (!confirm('Xóa TOÀN BỘ dữ liệu của cả nhóm trên Google Sheet?')) return;
+  if (!confirm('Chắc chắn chưa? Thao tác này không thể hoàn tác.')) return;
+  try {
+    await apiPost('clearAll');
+    await loadState();
+    setTodayInputs();
+    alert('Đã xóa toàn bộ dữ liệu trên Google Sheet.');
+  } catch (err) {
+    setSyncStatus('error');
+    alert('Xóa dữ liệu thất bại.\n' + err.message);
+  }
+}
+
+function startAutoSync(intervalMs = 30000) {
+  setInterval(() => loadState(true), intervalMs);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadState(true);
+  });
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function localDateStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function parseDate(s) { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d, 12, 0, 0, 0); }
+function fmtDate(s) { const d = parseDate(s); return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function fmtShort(s) { const d = parseDate(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; }
+function money(n) { return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + (state.settings.unit || 'đ'); }
+function addDays(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return localDateStr(d); }
+function startOfWeek(s) { const d = parseDate(s); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate() + diff); return localDateStr(d); }
+function endOfWeek(s) { return addDays(startOfWeek(s), 6); }
+function minuteOf(t) { const [h, m] = String(t).slice(0, 5).split(':').map(Number); return h * 60 + m; }
+function deadlineMinutes() { return minuteOf(state.settings.deadline) + Number(state.settings.grace || 0); }
+function isWeekday(s) { const d = parseDate(s).getDay(); return d >= 1 && d <= 5; }
+function isProgramDay(s) { return s >= state.settings.startDate && isWeekday(s); }
+function eligibleDaysInWeek(weekStart) { return [0, 1, 2, 3, 4].map(i => addDays(weekStart, i)).filter(isProgramDay); }
+function isFirstProgramWeek(weekStart) { return weekStart === startOfWeek(state.settings.startDate); }
+function isWeekExempt(weekStart) { return !!state.settings.waiveFirstWeek && isFirstProgramWeek(weekStart) && eligibleDaysInWeek(weekStart).length < state.settings.minPerWeek; }
+function isWeekCompleted(weekStart, today = localDateStr()) { return endOfWeek(weekStart) < today; }
+function validCheckin(ci) { return isProgramDay(ci.date) && Number.isFinite(minuteOf(ci.time)) && minuteOf(ci.time) <= deadlineMinutes(); }
+function getWeekCheckins(member, weekStart) { const end = endOfWeek(weekStart); return state.checkins.filter(c => c.member === member && c.date >= weekStart && c.date <= end); }
+function memberWeek(member, weekStart) {
+  const arr = getWeekCheckins(member, weekStart);
+  const valid = arr.filter(validCheckin).length;
+  const late = arr.filter(c => isProgramDay(c.date) && !validCheckin(c)).length;
+  const exempt = isWeekExempt(weekStart);
+  const shortage = Math.max(0, state.settings.minPerWeek - valid);
+  const completed = isWeekCompleted(weekStart);
+  const fine = (!exempt && completed && shortage > 0) ? state.settings.fineAmount : 0;
+  return { valid, late, shortage, exempt, completed, fine };
+}
+function fineKey(weekStart, member) { return `${member}|${weekStart}`; }
+function allCompletedWeekStarts() {
+  const today = localDateStr();
+  let w = startOfWeek(state.settings.startDate);
+  const out = [];
+  let guard = 0;
+  while (endOfWeek(w) < today && guard < 520) { out.push(w); w = addDays(w, 7); guard++; }
+  return out;
+}
+function allFines() {
+  const rows = [];
+  for (const w of allCompletedWeekStarts()) {
+    for (const m of MEMBERS) {
+      const st = memberWeek(m, w);
+      if (st.fine > 0) {
+        const key = fineKey(w, m);
+        rows.push({ weekStart: w, member: m, amount: st.fine, paid: !!state.fines[key]?.paid, paidAt: state.fines[key]?.paidAt || null, key });
+      }
+    }
+  }
+  return rows;
+}
+function finance() {
+  const fines = allFines();
+  const finePaid = fines.filter(x => x.paid).reduce((s, x) => s + x.amount, 0);
+  const receivable = fines.filter(x => !x.paid).reduce((s, x) => s + x.amount, 0);
+  const contrib = state.transactions.filter(t => t.type === 'contribution').reduce((s, t) => s + Number(t.amount || 0), 0);
+  const spent = state.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+  return { finePaid, receivable, contrib, spent, balance: finePaid + contrib - spent };
+}
+function currentWeek() { return startOfWeek(localDateStr()); }
+function setTodayInputs() {
+  const now = new Date();
+  $('#ciDate').value = localDateStr(now);
+  $('#ciTime').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  $('#txDate').value = localDateStr(now);
+  $('#reportDate').value = localDateStr(now);
+}
+
+function renderHeader() {
+  const now = new Date();
+  $('#liveTime').textContent = now.toLocaleTimeString('vi-VN', { hour12: false });
+  $('#liveDate').textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const today = localDateStr(now);
+  const n = $('#preStartNotice');
+  if (today < state.settings.startDate) {
+    const diff = Math.ceil((parseDate(state.settings.startDate) - parseDate(today)) / 86400000);
+    n.className = 'notice show';
+    n.innerHTML = `Chương trình chưa bắt đầu. Còn <b>${diff} ngày</b> tới ${fmtDate(state.settings.startDate)}.`;
+  } else n.className = 'notice';
+}
+
+function renderMemberSelects() {
+  const ciCurrent = $('#ciMember').value;
+  const txCurrent = $('#txMember').value;
+  const opts = MEMBERS.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  $('#ciMember').innerHTML = opts;
+  $('#txMember').innerHTML = '<option value="">— Nhóm —</option>' + opts;
+  if (MEMBERS.includes(ciCurrent)) $('#ciMember').value = ciCurrent;
+  if (txCurrent === '' || MEMBERS.includes(txCurrent)) $('#txMember').value = txCurrent;
+}
+
+function renderOverview() {
+  const f = finance();
+  $('#kpiFund').textContent = money(f.balance);
+  $('#kpiReceivable').textContent = money(f.receivable);
+  $('#kpiReceivableFoot').textContent = `${allFines().filter(x => !x.paid).length} khoản chưa nộp`;
+  const w = currentWeek();
+  const stats = MEMBERS.map(m => ({ m, ...memberWeek(m, w) }));
+  const hit = stats.filter(x => x.valid >= state.settings.minPerWeek).length;
+  const total = stats.reduce((s, x) => s + x.valid, 0);
+  $('#kpiHitRate').textContent = Math.round(hit / MEMBERS.length * 100) + '%';
+  $('#kpiHitRateFoot').textContent = `${hit}/${MEMBERS.length} thành viên đang đạt`;
+  $('#kpiSessions').textContent = total;
+  $('#currentWeekLabel').textContent = `${fmtDate(w)} → ${fmtDate(endOfWeek(w))}`;
+  const exempt = isWeekExempt(w);
+  $('#weekStateBadge').textContent = exempt ? 'Tuần khởi động • miễn phạt' : (isWeekCompleted(w) ? 'Đã chốt' : 'Đang theo dõi');
+  $('#weekStateBadge').className = 'badge neutral';
+  $('#memberCards').innerHTML = stats.map(x => {
+    const pct = Math.min(100, Math.round(x.valid / state.settings.minPerWeek * 100));
+    const status = x.valid >= state.settings.minPerWeek ? 'Đã đạt' : `${x.valid}/${state.settings.minPerWeek} buổi`;
+    return `<div class="card member"><div class="member-top"><div style="display:flex;align-items:center;gap:10px"><div class="avatar">${esc(x.m.charAt(0))}</div><div><b>${esc(x.m)}</b><div class="mini">${x.late} buổi muộn</div></div></div><span class="status-pill">${status}</span></div><div class="progress"><span style="width:${pct}%"></span></div><div class="member-stats"><span>${x.valid} buổi hợp lệ</span><span>${pct}%</span></div></div>`;
+  }).join('');
   renderHeatmap(w);
 }
-function renderHeatmap(w){const days=[0,1,2,3,4].map(i=>addDays(w,i));let html='<div></div>'+days.map(d=>`<div class="head">${['CN','T2','T3','T4','T5','T6','T7'][parseDate(d).getDay()]}<br>${fmtShort(d)}</div>`).join('');for(const m of state.config.members){html+=`<div class="label">${esc(m)}</div>`;for(const d of days){const ci=state.checkins.find(c=>c.member===m&&c.date===d);let cls='cell',txt='—';if(ci){cls+=' '+(validCheckin(ci)?'on':'late');txt=ci.time}if(d<state.config.startDate){txt='·'}html+=`<div class="${cls}">${txt}</div>`}}$('#heatmap').innerHTML=html}
-function renderCheckins(){const rows=[...state.checkins].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));$('#checkinHistory').innerHTML=rows.length?rows.map(c=>`<tr><td>${fmtDate(c.date)}</td><td><b>${esc(c.member)}</b></td><td>${esc(c.time)}</td><td>${validCheckin(c)?'<span class="badge ok">Đúng giờ</span>':'<span class="badge fail">Muộn / không hợp lệ</span>'}</td><td>${esc(c.note||'—')}</td><td>${c.proof?`<a href="${attr(c.proof)}" target="_blank" style="color:#8dc5ff">Mở link</a>`:'—'}</td><td><button class="btn btn-danger" style="padding:6px 9px" onclick="deleteCheckin('${c.id}')">Xóa</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty">Chưa có lượt điểm danh nào.</td></tr>`}
-function renderWeekly(){const selected=$('#reportDate').value||localDateStr();const w=startOfWeek(selected),end=endOfWeek(w);const exempt=isWeekExempt(w),completed=isWeekCompleted(w);const elig=eligibleDaysInWeek(w).length;$('#weekReportMeta').innerHTML=`Tuần <strong>${fmtDate(w)} → ${fmtDate(end)}</strong> • ${elig} ngày chương trình hợp lệ • ${exempt?'<strong>Tuần khởi động: miễn phạt</strong>':completed?'Đã kết thúc — có thể chốt phạt':'Đang diễn ra — tiền phạt mới chỉ là dự báo'}`;
-  $('#weeklyBody').innerHTML=state.config.members.map(m=>{const st=memberWeek(m,w);const key=paymentKey(w,m);const paid=!!state.payments[key]?.paid;const shouldFine=st.fine>0;const displayFine=shouldFine?st.fine:(!st.exempt&&!st.completed&&st.shortage>0?state.config.fineAmount:0);const status=st.exempt?'<span class="badge neutral">Miễn phạt</span>':st.valid>=state.config.targetPerWeek?'<span class="badge ok">Đạt</span>':st.completed?'<span class="badge fail">Thiếu buổi</span>':'<span class="badge neutral">Đang chạy</span>';return `<tr class="${st.completed&&st.shortage>0&&!st.exempt?'alert-row':''}"><td><b>${esc(m)}</b></td><td>${st.valid}</td><td>${st.late}</td><td>${state.config.targetPerWeek}</td><td>${st.shortage}</td><td class="money ${displayFine?'bad':''}">${displayFine?money(displayFine):'0đ'}${!st.completed&&displayFine?'<div class="mini">dự báo</div>':''}</td><td>${shouldFine?`<input class="checkbox" type="checkbox" ${paid?'checked':''} onchange="togglePayment('${w}','${jsq(m)}',this.checked)">`:'—'}</td><td>${status}</td></tr>`}).join('')}
-function renderFund(){const f=finance();$('#fundBalance').textContent=money(f.balance);$('#fundFinePaid').textContent=money(f.finePaid);$('#fundContrib').textContent=money(f.contrib);$('#fundSpent').textContent=money(f.spent);const ledger=[];for(const x of allFines().filter(x=>x.paid)){ledger.push({id:'fine:'+x.key,date:x.paidAt?x.paidAt.slice(0,10):endOfWeek(x.weekStart),type:'fine',member:x.member,note:`Phạt tuần ${fmtShort(x.weekStart)}–${fmtShort(endOfWeek(x.weekStart))}`,amount:x.amount,auto:true})}for(const t of state.transactions)ledger.push({...t,auto:false});ledger.sort((a,b)=>(b.date+(b.createdAt||'')).localeCompare(a.date+(a.createdAt||'')));$('#ledgerBody').innerHTML=ledger.length?ledger.map(x=>{const inc=x.type!=='expense';const type=x.type==='fine'?'Tiền phạt':x.type==='contribution'?'Đóng góp':'Chi tiêu';return `<tr><td>${fmtDate(x.date)}</td><td>${type}</td><td>${esc(x.member||'Nhóm')}</td><td>${esc(x.note||'—')}</td><td class="right money ${inc?'ledger-positive':'ledger-negative'}">${inc?'+':'−'}${money(Math.abs(Number(x.amount||0)))}</td><td>${x.auto?'':'<button class="btn btn-danger" style="padding:6px 9px" onclick="deleteTx(\''+x.id+'\')">Xóa</button>'}</td></tr>`}).join(''):`<tr><td colspan="6" class="empty">Chưa có giao dịch quỹ.</td></tr>`}
-function renderSettings(){const c=state.config;$('#setStartDate').value=c.startDate;$('#setCheckinTime').value=c.checkinTime;$('#setGrace').value=c.graceMinutes;$('#setTarget').value=c.targetPerWeek;$('#setFine').value=c.fineAmount;$('#setExemptFirst').checked=!!c.exemptShortFirstWeek;$('#deadlineBadge').textContent=`Deadline ${minutesToTime(deadlineMinutes())}`}
-function renderAll(){renderHeader();renderMemberSelects();renderOverview();renderCheckins();renderWeekly();renderFund();renderSettings()}
-function minutesToTime(n){return `${pad(Math.floor(n/60)%24)}:${pad(n%60)}`}
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function attr(s){return esc(s).replace(/`/g,'')}
-function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 
-function saveCheckin(){const member=$('#ciMember').value,date=$('#ciDate').value,time=$('#ciTime').value,note=$('#ciNote').value.trim(),proof=$('#ciProof').value.trim();if(!member||!date||!time)return alert('Vui lòng chọn thành viên, ngày và giờ điểm danh.');if(!isWeekday(date))return alert('Thứ 7, Chủ Nhật không tính điểm danh theo luật chương trình.');if(date<state.config.startDate)return alert('Ngày này nằm trước ngày bắt đầu chương trình.');const existing=state.checkins.find(c=>c.member===member&&c.date===date);if(existing){if(!confirm(`${member} đã có điểm danh ngày ${fmtDate(date)}. Ghi đè bản ghi cũ?`))return;Object.assign(existing,{time,note,proof,updatedAt:new Date().toISOString()})}else{state.checkins.push({id:crypto.randomUUID?crypto.randomUUID():'ci_'+Date.now(),member,date,time,note,proof,createdAt:new Date().toISOString()})}save();$('#ciNote').value='';$('#ciProof').value='';alert(validCheckin({member,date,time})?'Đã lưu điểm danh hợp lệ.':'Đã lưu, nhưng lượt này muộn hơn deadline nên không được tính vào chỉ tiêu tuần.')}
-window.deleteCheckin=id=>{if(confirm('Xóa lượt điểm danh này?')){state.checkins=state.checkins.filter(c=>c.id!==id);save()}}
-window.togglePayment=(w,m,checked)=>{const key=paymentKey(w,m);state.payments[key]={paid:checked,paidAt:checked?new Date().toISOString():null};save()}
-function addTx(){const type=$('#txType').value,amount=Number($('#txAmount').value),date=$('#txDate').value,member=$('#txMember').value,note=$('#txNote').value.trim();if(!amount||amount<=0||!date)return alert('Vui lòng nhập số tiền > 0 và ngày giao dịch.');state.transactions.push({id:crypto.randomUUID?crypto.randomUUID():'tx_'+Date.now(),type,amount,date,member,note,createdAt:new Date().toISOString()});save();$('#txAmount').value='';$('#txNote').value=''}
-window.deleteTx=id=>{if(confirm('Xóa giao dịch này?')){state.transactions=state.transactions.filter(t=>t.id!==id);save()}}
-function saveSettings(){const startDate=$('#setStartDate').value,checkinTime=$('#setCheckinTime').value,graceMinutes=Number($('#setGrace').value),targetPerWeek=Number($('#setTarget').value),fineAmount=Number($('#setFine').value);if(!startDate||!checkinTime||targetPerWeek<1||targetPerWeek>5||fineAmount<0||graceMinutes<0)return alert('Cài đặt chưa hợp lệ.');state.config={...state.config,startDate,checkinTime,graceMinutes,targetPerWeek,fineAmount,exemptShortFirstWeek:$('#setExemptFirst').checked};save();alert('Đã lưu cài đặt.')}
-function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ve-dich-binh-ngo-backup-${localDateStr()}.json`;a.click();URL.revokeObjectURL(url)}
-function importData(file){const r=new FileReader();r.onload=()=>{try{const incoming=JSON.parse(r.result);if(!incoming.config||!Array.isArray(incoming.checkins))throw new Error('invalid');if(!confirm('Nhập backup sẽ thay thế dữ liệu hiện tại. Tiếp tục?'))return;state={...clone(DEFAULT_STATE),...incoming,config:{...clone(DEFAULT_STATE).config,...incoming.config}};save();alert('Đã nhập dữ liệu backup.')}catch(e){alert('File backup không hợp lệ.')}};r.readAsText(file)}
+function renderHeatmap(w) {
+  const days = [0, 1, 2, 3, 4].map(i => addDays(w, i));
+  let html = '<div></div>' + days.map(d => `<div class="head">${['CN','T2','T3','T4','T5','T6','T7'][parseDate(d).getDay()]}<br>${fmtShort(d)}</div>`).join('');
+  for (const m of MEMBERS) {
+    html += `<div class="label">${esc(m)}</div>`;
+    for (const d of days) {
+      const ci = state.checkins.find(c => c.member === m && c.date === d);
+      let cls = 'cell', txt = '—';
+      if (ci) { cls += ' ' + (validCheckin(ci) ? 'on' : 'late'); txt = ci.time; }
+      if (d < state.settings.startDate) txt = '·';
+      html += `<div class="${cls}">${esc(txt)}</div>`;
+    }
+  }
+  $('#heatmap').innerHTML = html;
+}
 
-$$('.tab-btn').forEach(b=>b.addEventListener('click',()=>{$$('.tab-btn').forEach(x=>x.classList.remove('active'));$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#'+b.dataset.tab).classList.add('active');if(b.dataset.tab==='weekly')renderWeekly()}));
-$('#btnCheckin').addEventListener('click',saveCheckin);$('#btnNow').addEventListener('click',()=>{const n=new Date();$('#ciDate').value=localDateStr(n);$('#ciTime').value=`${pad(n.getHours())}:${pad(n.getMinutes())}`});$('#reportDate').addEventListener('change',renderWeekly);$('#btnAddTx').addEventListener('click',addTx);$('#btnSaveSettings').addEventListener('click',saveSettings);$('#btnExport').addEventListener('click',exportData);$('#importFile').addEventListener('change',e=>e.target.files[0]&&importData(e.target.files[0]));$('#btnReset').addEventListener('click',()=>{if(confirm('Xóa TOÀN BỘ dữ liệu điểm danh, tiền phạt và quỹ?')){localStorage.removeItem(STORAGE_KEY);state=clone(DEFAULT_STATE);setTodayInputs();save()}});
-setTodayInputs();renderAll();setInterval(renderHeader,1000);
+function renderCheckins() {
+  const rows = [...state.checkins].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  $('#checkinHistory').innerHTML = rows.length ? rows.map(c => `<tr><td>${fmtDate(c.date)}</td><td><b>${esc(c.member)}</b></td><td>${esc(c.time)}</td><td>${validCheckin(c) ? '<span class="badge ok">Đúng giờ</span>' : '<span class="badge fail">Muộn / không hợp lệ</span>'}</td><td>${esc(c.note || '—')}</td><td>${c.proof ? `<a href="${attr(c.proof)}" target="_blank" rel="noopener" style="color:#8dc5ff">Mở link</a>` : '—'}</td><td><button class="btn btn-danger" style="padding:6px 9px" onclick="confirmDeleteCheckin('${jsq(c.id)}')">Xóa</button></td></tr>`).join('') : '<tr><td colspan="7" class="empty">Chưa có lượt điểm danh nào.</td></tr>';
+}
+
+function renderWeekly() {
+  const selected = $('#reportDate').value || localDateStr();
+  const w = startOfWeek(selected), end = endOfWeek(w);
+  const exempt = isWeekExempt(w), completed = isWeekCompleted(w), elig = eligibleDaysInWeek(w).length;
+  $('#weekReportMeta').innerHTML = `Tuần <strong>${fmtDate(w)} → ${fmtDate(end)}</strong> • ${elig} ngày chương trình hợp lệ • ${exempt ? '<strong>Tuần khởi động: miễn phạt</strong>' : completed ? 'Đã kết thúc — có thể chốt phạt' : 'Đang diễn ra — tiền phạt mới chỉ là dự báo'}`;
+  $('#weeklyBody').innerHTML = MEMBERS.map(m => {
+    const st = memberWeek(m, w);
+    const key = fineKey(w, m);
+    const paid = !!state.fines[key]?.paid;
+    const shouldFine = st.fine > 0;
+    const displayFine = shouldFine ? st.fine : (!st.exempt && !st.completed && st.shortage > 0 ? state.settings.fineAmount : 0);
+    const status = st.exempt ? '<span class="badge neutral">Miễn phạt</span>' : st.valid >= state.settings.minPerWeek ? '<span class="badge ok">Đạt</span>' : st.completed ? '<span class="badge fail">Thiếu buổi</span>' : '<span class="badge neutral">Đang chạy</span>';
+    return `<tr class="${st.completed && st.shortage > 0 && !st.exempt ? 'alert-row' : ''}"><td><b>${esc(m)}</b></td><td>${st.valid}</td><td>${st.late}</td><td>${state.settings.minPerWeek}</td><td>${st.shortage}</td><td class="money ${displayFine ? 'bad' : ''}">${displayFine ? money(displayFine) : money(0)}${!st.completed && displayFine ? '<div class="mini">dự báo</div>' : ''}</td><td>${shouldFine ? `<input class="checkbox" type="checkbox" ${paid ? 'checked' : ''} onchange="setFinePaid('${jsq(m)}','${w}',this.checked)">` : '—'}</td><td>${status}</td></tr>`;
+  }).join('');
+}
+
+function renderFund() {
+  const f = finance();
+  $('#fundBalance').textContent = money(f.balance);
+  $('#fundFinePaid').textContent = money(f.finePaid);
+  $('#fundContrib').textContent = money(f.contrib);
+  $('#fundSpent').textContent = money(f.spent);
+  const ledger = [];
+  for (const x of allFines().filter(x => x.paid)) {
+    ledger.push({ id: 'fine:' + x.key, date: x.paidAt ? x.paidAt.slice(0, 10) : endOfWeek(x.weekStart), type: 'fine', member: x.member, note: `Phạt tuần ${fmtShort(x.weekStart)}–${fmtShort(endOfWeek(x.weekStart))}`, amount: x.amount, auto: true });
+  }
+  for (const t of state.transactions) ledger.push({ ...t, auto: false });
+  ledger.sort((a, b) => (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || '')));
+  $('#ledgerBody').innerHTML = ledger.length ? ledger.map(x => {
+    const inc = x.type !== 'expense';
+    const type = x.type === 'fine' ? 'Tiền phạt' : x.type === 'contribution' ? 'Đóng góp' : 'Chi tiêu';
+    return `<tr><td>${fmtDate(x.date)}</td><td>${type}</td><td>${esc(x.member || 'Nhóm')}</td><td>${esc(x.note || '—')}</td><td class="right money ${inc ? 'ledger-positive' : 'ledger-negative'}">${inc ? '+' : '−'}${money(Math.abs(Number(x.amount || 0)))}</td><td>${x.auto ? '' : `<button class="btn btn-danger" style="padding:6px 9px" onclick="confirmDeleteTransaction('${jsq(x.id)}')">Xóa</button>`}</td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Chưa có giao dịch quỹ.</td></tr>';
+}
+
+function renderSettings() {
+  const s = state.settings;
+  $('#setStartDate').value = s.startDate;
+  $('#setCheckinTime').value = s.deadline;
+  $('#setGrace').value = s.grace;
+  $('#setTarget').value = s.minPerWeek;
+  $('#setFine').value = s.fineAmount;
+  $('#setExemptFirst').checked = !!s.waiveFirstWeek;
+  $('#deadlineBadge').textContent = `Deadline ${minutesToTime(deadlineMinutes())}`;
+}
+
+function renderAll() {
+  renderHeader();
+  renderMemberSelects();
+  renderOverview();
+  renderCheckins();
+  renderWeekly();
+  renderFund();
+  renderSettings();
+}
+
+function minutesToTime(n) { return `${pad(Math.floor(n / 60) % 24)}:${pad(n % 60)}`; }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[m])); }
+function attr(s) { return esc(s).replace(/`/g, ''); }
+function jsq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+async function handleSaveCheckin() {
+  const member = $('#ciMember').value;
+  const date = $('#ciDate').value;
+  const time = $('#ciTime').value;
+  const note = $('#ciNote').value.trim();
+  const proof = $('#ciProof').value.trim();
+  if (!member || !date || !time) return alert('Vui lòng chọn thành viên, ngày và giờ điểm danh.');
+  if (!isWeekday(date)) return alert('Thứ 7, Chủ Nhật không tính điểm danh theo luật chương trình.');
+  if (date < state.settings.startDate) return alert('Ngày này nằm trước ngày bắt đầu chương trình.');
+
+  const existing = state.checkins.find(c => c.member === member && c.date === date);
+  try {
+    if (existing) {
+      if (!confirm(`${member} đã có điểm danh ngày ${fmtDate(date)}. Ghi đè bản ghi cũ trên Google Sheet?`)) return;
+      await replaceCheckin(existing, { member, date, time, proof, note });
+    } else {
+      await addCheckin({ member, date, time, proof, note });
+    }
+    $('#ciNote').value = '';
+    $('#ciProof').value = '';
+    alert(validCheckin({ member, date, time }) ? 'Đã lưu điểm danh hợp lệ lên Google Sheets.' : 'Đã lưu, nhưng lượt này muộn hơn deadline nên không được tính vào chỉ tiêu tuần.');
+  } catch (_) {}
+}
+
+window.confirmDeleteCheckin = async id => {
+  if (confirm('Xóa lượt điểm danh này khỏi Google Sheet?')) await deleteCheckin(id);
+};
+
+window.confirmDeleteTransaction = async id => {
+  if (confirm('Xóa giao dịch này khỏi Google Sheet?')) await deleteTransaction(id);
+};
+
+async function handleAddTransaction() {
+  const type = $('#txType').value;
+  const amount = Number($('#txAmount').value);
+  const date = $('#txDate').value;
+  const member = $('#txMember').value;
+  const note = $('#txNote').value.trim();
+  if (!amount || amount <= 0 || !date) return alert('Vui lòng nhập số tiền > 0 và ngày giao dịch.');
+  try {
+    await addTransaction({ type, amount, date, member, note });
+    $('#txAmount').value = '';
+    $('#txNote').value = '';
+  } catch (_) {}
+}
+
+async function handleSaveSettings() {
+  const startDate = $('#setStartDate').value;
+  const deadline = $('#setCheckinTime').value;
+  const grace = Number($('#setGrace').value);
+  const minPerWeek = Number($('#setTarget').value);
+  const fineAmount = Number($('#setFine').value);
+  const waiveFirstWeek = $('#setExemptFirst').checked;
+  if (!startDate || !deadline || minPerWeek < 1 || minPerWeek > 5 || fineAmount < 0 || grace < 0) return alert('Cài đặt chưa hợp lệ.');
+  const ok = await saveSettings({ startDate, deadline, grace, minPerWeek, fineAmount, unit: 'đ', waiveFirstWeek });
+  if (ok) alert('Đã lưu cài đặt lên Google Sheets.');
+}
+
+function exportData() {
+  const payload = { exportedAt: new Date().toISOString(), source: 'Google Sheets Apps Script', ...state };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ve-dich-binh-ngo-backup-${localDateStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  $$('.tab-btn').forEach(b => b.addEventListener('click', () => {
+    $$('.tab-btn').forEach(x => x.classList.remove('active'));
+    $$('.tab').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    $('#' + b.dataset.tab).classList.add('active');
+    if (b.dataset.tab === 'weekly') renderWeekly();
+  }));
+
+  $('#btnCheckin').addEventListener('click', handleSaveCheckin);
+  $('#btnNow').addEventListener('click', () => {
+    const n = new Date();
+    $('#ciDate').value = localDateStr(n);
+    $('#ciTime').value = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  });
+  $('#reportDate').addEventListener('change', renderWeekly);
+  $('#btnAddTx').addEventListener('click', handleAddTransaction);
+  $('#btnSaveSettings').addEventListener('click', handleSaveSettings);
+  $('#btnExport').addEventListener('click', exportData);
+  $('#btnReset').addEventListener('click', clearAllData);
+
+  setTodayInputs();
+  renderAll();
+  setSyncStatus('loading');
+  await loadState();
+  startAutoSync();
+  setInterval(renderHeader, 1000);
+});
+
 </script>
 </body>
 </html>
