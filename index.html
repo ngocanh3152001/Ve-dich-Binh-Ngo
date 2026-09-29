@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Về đích Bính Ngọ — Dashboard</title>
+<style>
+:root{
+  --bg:#0b0f14;--panel:#111821;--panel2:#151f2b;--line:#263240;--text:#f7f7f5;--muted:#9fb0c2;
+  --accent:#ff6b35;--accent2:#ffb703;--good:#28c76f;--bad:#ff4d6d;--info:#5aa9ff;--shadow:0 14px 40px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(255,107,53,.12),transparent 28%),radial-gradient(circle at 88% 18%,rgba(255,183,3,.08),transparent 26%),var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;padding:24px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.brand{display:flex;align-items:center;gap:12px}.brandmark{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;box-shadow:var(--shadow);font-size:24px}.brand h1{font-size:20px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}.clock{border:1px solid var(--line);background:rgba(17,24,33,.78);backdrop-filter:blur(10px);padding:10px 14px;border-radius:14px;text-align:right}.clock strong{display:block;font-size:17px}.clock span{font-size:12px;color:var(--muted)}
+.hero{display:grid;grid-template-columns:1.5fr .7fr;gap:18px;background:linear-gradient(135deg,rgba(255,107,53,.14),rgba(255,183,3,.06));border:1px solid rgba(255,107,53,.25);border-radius:24px;padding:24px;box-shadow:var(--shadow);overflow:hidden;position:relative}.hero:after{content:"🐎";position:absolute;right:22%;bottom:-24px;font-size:150px;opacity:.06;transform:rotate(-8deg)}.eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:12px;font-weight:700;color:#ffd7c7;background:rgba(255,107,53,.14);border:1px solid rgba(255,107,53,.35);padding:7px 10px;border-radius:999px}.hero h2{font-size:34px;line-height:1.08;margin:14px 0 10px}.hero p{color:#cad5df;max-width:750px;line-height:1.6;margin:0}.hero-side{display:grid;gap:10px;align-content:center}.rule{background:rgba(11,15,20,.55);border:1px solid rgba(255,255,255,.08);padding:13px 14px;border-radius:14px}.rule b{display:block;font-size:14px;margin-bottom:3px}.rule span{font-size:12px;color:var(--muted)}
+.notice{display:none;margin-top:14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(90,169,255,.35);background:rgba(90,169,255,.08);color:#dcecff}.notice.show{display:block}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 14px}.tab-btn{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 13px;border-radius:12px;cursor:pointer}.tab-btn.active{background:linear-gradient(135deg,var(--accent),#ff864f);color:white;border-color:transparent;font-weight:700}.tab{display:none}.tab.active{display:block}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:linear-gradient(180deg,rgba(21,31,43,.96),rgba(17,24,33,.96));border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 8px 22px rgba(0,0,0,.18)}.kpi-label{color:var(--muted);font-size:12px}.kpi-value{font-size:28px;font-weight:800;margin:6px 0}.kpi-foot{font-size:12px;color:#c3cfda}.good{color:var(--good)}.bad{color:var(--bad)}.warning{color:var(--accent2)}.info{color:var(--info)}
+.section{margin-top:16px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.section-head h3{margin:0;font-size:17px}.section-head p{margin:2px 0 0;color:var(--muted);font-size:12px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}.members{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.member{position:relative;overflow:hidden}.member-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:linear-gradient(135deg,#ff7b50,#ffd166);color:#25140d}.status-pill{font-size:11px;padding:6px 8px;border-radius:999px;background:#202c39;color:#cfe0ef}.progress{height:9px;border-radius:999px;background:#24303d;overflow:hidden;margin:8px 0}.progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px}.member-stats{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}.mini{font-size:11px;color:var(--muted)}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;min-width:760px;background:rgba(17,24,33,.85)}th,td{padding:12px 13px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:#111821;position:sticky;top:0}tr:last-child td{border-bottom:0}tr.alert-row{background:rgba(255,77,109,.055)}.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:700}.badge.ok{background:rgba(40,199,111,.12);color:#7be8a7}.badge.fail{background:rgba(255,77,109,.12);color:#ff9aae}.badge.neutral{background:#202c39;color:#c7d4e1}.money{font-variant-numeric:tabular-nums}.checkbox{width:18px;height:18px;accent-color:var(--good)}
+.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;color:var(--muted)}.field input,.field select,.field textarea{width:100%;background:#0f151d;border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:12px;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:rgba(255,107,53,.75);box-shadow:0 0 0 3px rgba(255,107,53,.10)}.field textarea{min-height:74px;resize:vertical}.span2{grid-column:span 2}.span4{grid-column:span 4}.btn{border:0;border-radius:12px;padding:11px 14px;cursor:pointer;font-weight:700}.btn-primary{background:linear-gradient(135deg,var(--accent),#ff8754);color:#fff}.btn-secondary{background:#202b37;color:#e7eef5;border:1px solid #304050}.btn-danger{background:rgba(255,77,109,.12);color:#ff9aae;border:1px solid rgba(255,77,109,.25)}.actions{display:flex;gap:8px;flex-wrap:wrap}.callout{border:1px solid rgba(255,183,3,.28);background:rgba(255,183,3,.07);padding:12px 14px;border-radius:14px;color:#ffe3a0;font-size:13px;line-height:1.5}.callout strong{color:#fff1c9}.empty{padding:28px;text-align:center;color:var(--muted)}
+.heatmap{display:grid;grid-template-columns:130px repeat(5,1fr);gap:7px;align-items:center}.heatmap .cell{height:42px;border-radius:10px;background:#1d2834;border:1px solid #263542;display:grid;place-items:center;font-size:11px;color:#9fb0c2}.heatmap .cell.on{background:rgba(40,199,111,.17);border-color:rgba(40,199,111,.32);color:#92f0b6}.heatmap .cell.late{background:rgba(255,183,3,.13);border-color:rgba(255,183,3,.3);color:#ffd978}.heatmap .label{font-size:12px;color:#d9e2eb}.heatmap .head{font-size:11px;color:var(--muted);text-align:center}.footnote{font-size:11px;color:var(--muted);margin-top:9px}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.big-money{font-size:34px;font-weight:900}.ledger-positive{color:#7be8a7}.ledger-negative{color:#ff9aae}.right{text-align:right}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:18px;height:18px;accent-color:var(--accent)}.footer{padding:26px 0 8px;color:#718397;text-align:center;font-size:11px}
+@media(max-width:980px){.hero{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.members{grid-template-columns:1fr}.two-col,.settings-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr 1fr}.span4{grid-column:span 2}.heatmap{grid-template-columns:92px repeat(5,1fr)}}
+@media(max-width:620px){.app{padding:14px}.topbar{align-items:flex-start}.clock{display:none}.hero{padding:18px}.hero h2{font-size:28px}.grid4{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}.heatmap{grid-template-columns:70px repeat(5,1fr);gap:4px}.heatmap .cell{height:36px}.tabs{position:sticky;top:0;background:rgba(11,15,20,.92);backdrop-filter:blur(12px);z-index:20;padding:8px 0}.tab-btn{padding:9px 10px;font-size:12px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="brandmark">🏁</div><div><h1>Về đích Bính Ngọ</h1><p>Thi đua dậy sớm • ngồi vào bàn • học đều</p></div></div>
+    <div class="clock"><strong id="liveTime">--:--:--</strong><span id="liveDate">--</span></div>
+  </div>
+
+  <section class="hero">
+    <div>
+      <span class="eyebrow">🔥 START 01/10/2026 • THỨ NĂM</span>
+      <h2>6:00 sáng có mặt.<br/>3 buổi mỗi tuần. Không viện lý do.</h2>
+      <p>Dashboard theo dõi điểm danh, mức độ hoàn thành, tiền phạt và quỹ ăn chơi của Ánh • Hằng • Uyên. Dữ liệu được lưu trực tiếp trên trình duyệt này.</p>
+      <div class="notice" id="preStartNotice"></div>
+    </div>
+    <div class="hero-side">
+      <div class="rule"><b>⏰ Mốc chuẩn</b><span>Điểm danh 06:00, Thứ 2–Thứ 6</span></div>
+      <div class="rule"><b>🎯 Cam kết</b><span>Tối thiểu 3 buổi hợp lệ / người / tuần</span></div>
+      <div class="rule"><b>💸 Không đạt</b><span>50.000đ / người / tuần → quỹ chung</span></div>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="overview">Tổng quan</button>
+    <button class="tab-btn" data-tab="checkin">Điểm danh</button>
+    <button class="tab-btn" data-tab="weekly">Báo cáo tuần</button>
+    <button class="tab-btn" data-tab="fund">Quỹ chung</button>
+    <button class="tab-btn" data-tab="settings">Cài đặt</button>
+  </nav>
+
+  <main>
+    <section class="tab active" id="overview">
+      <div class="grid4">
+        <div class="card"><div class="kpi-label">Quỹ hiện tại</div><div class="kpi-value money" id="kpiFund">0đ</div><div class="kpi-foot">Tiền phạt đã nộp + đóng góp − chi tiêu</div></div>
+        <div class="card"><div class="kpi-label">Phạt còn phải thu</div><div class="kpi-value bad money" id="kpiReceivable">0đ</div><div class="kpi-foot" id="kpiReceivableFoot">Chỉ tính các tuần đã kết thúc</div></div>
+        <div class="card"><div class="kpi-label">Tỷ lệ đạt tuần này</div><div class="kpi-value" id="kpiHitRate">0%</div><div class="kpi-foot" id="kpiHitRateFoot">0/3 thành viên đang đạt</div></div>
+        <div class="card"><div class="kpi-label">Buổi hợp lệ tuần này</div><div class="kpi-value info" id="kpiSessions">0</div><div class="kpi-foot">Tổng của cả nhóm</div></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><div><h3>Tiến độ tuần này</h3><p id="currentWeekLabel"></p></div><span class="badge neutral" id="weekStateBadge">Đang theo dõi</span></div>
+        <div class="members" id="memberCards"></div>
+      </div>
+
+      <div class="section two-col">
+        <div class="card">
+          <div class="section-head"><div><h3>Lịch điểm danh tuần</h3><p>Xanh = đúng giờ • Vàng = muộn • Trống = chưa có</p></div></div>
+          <div class="heatmap" id="heatmap"></div>
+          <div class="footnote">Buổi muộn được lưu lịch sử nhưng không tính vào chỉ tiêu tuần.</div>
+        </div>
+        <div class="card">
+          <div class="section-head"><div><h3>Checklist vận hành</h3><p>Giúp nhóm không chỉ “có mặt” mà còn duy trì chất lượng học</p></div></div>
+          <div class="callout"><strong>Đề xuất:</strong> mỗi lần điểm danh nên nhập “Nội dung học / mục tiêu buổi sáng”. Sau 4–6 tuần bạn sẽ có dữ liệu để xem ai học đều, chủ đề nào được duy trì tốt và mức độ kỷ luật thực sự.</div>
+          <div style="height:10px"></div>
+          <div class="rule"><b>01. Có mặt</b><span>Ngồi vào bàn và điểm danh trước deadline.</span></div>
+          <div class="rule" style="margin-top:8px"><b>02. Có mục tiêu</b><span>Ghi ngắn gọn nội dung học để tăng tính cam kết.</span></div>
+          <div class="rule" style="margin-top:8px"><b>03. Có hậu kiểm</b><span>Cuối tuần chốt thiếu buổi → tự động phát sinh tiền phạt.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="checkin">
+      <div class="card">
+        <div class="section-head"><div><h3>Điểm danh buổi học</h3><p>Ghi nhận thời gian thực tế, nội dung học và minh chứng nếu cần.</p></div><span class="badge neutral" id="deadlineBadge">Deadline 06:05</span></div>
+        <div class="form-grid">
+          <div class="field"><label>Thành viên</label><select id="ciMember"></select></div>
+          <div class="field"><label>Ngày</label><input id="ciDate" type="date" /></div>
+          <div class="field"><label>Giờ điểm danh</label><input id="ciTime" type="time" step="60" /></div>
+          <div class="field"><label>Minh chứng (URL, tùy chọn)</label><input id="ciProof" type="url" placeholder="https://..." /></div>
+          <div class="field span4"><label>Nội dung học / mục tiêu buổi sáng</label><textarea id="ciNote" placeholder="Ví dụ: IELTS Speaking Part 2 — luyện 3 cue cards"></textarea></div>
+          <div class="span4 actions"><button class="btn btn-primary" id="btnCheckin">✓ Lưu điểm danh</button><button class="btn btn-secondary" id="btnNow">Dùng ngày & giờ hiện tại</button></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-head"><div><h3>Lịch sử điểm danh</h3><p>Có thể xóa bản ghi nếu nhập nhầm.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Thành viên</th><th>Giờ</th><th>Trạng thái</th><th>Nội dung</th><th>Minh chứng</th><th></th></tr></thead><tbody id="checkinHistory"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="tab" id="weekly">
+      <div class="card">
+        <div class="section-head"><div><h3>Báo cáo tuần</h3><p>Chọn một ngày bất kỳ; hệ thống tự quy về tuần Thứ 2–Chủ Nhật.</p></div><div class="field" style="min-width:190px"><input type="date" id="reportDate" /></div></div>
+        <div id="weekReportMeta" class="callout" style="margin-bottom:12px"></div>
+        <div class="table-wrap"><table><thead><tr><th>Thành viên</th><th>Buổi hợp lệ</th><th>Buổi muộn</th><th>Mục tiêu</th><th>Thiếu</th><th>Tiền phạt</th><th>Đã nộp</th><th>Trạng thái</th></tr></thead><tbody id="weeklyBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="tab" id="fund">
+      <div class="grid4">
+        <div class="card"><div class="kpi-label">Số dư quỹ</div><div class="kpi-value good money" id="fundBalance">0đ</div><div class="kpi-foot">Dùng cho các “sự ăn chơi” của nhóm</div></div>
+        <div class="card"><div class="kpi-label">Tiền phạt đã thu</div><div class="kpi-value money" id="fundFinePaid">0đ</div><div class="kpi-foot">Từ các tuần không đạt chỉ tiêu</div></div>
+        <div class="card"><div class="kpi-label">Đóng góp khác</div><div class="kpi-value money" id="fundContrib">0đ</div><div class="kpi-foot">Nạp quỹ ngoài tiền phạt</div></div>
+        <div class="card"><div class="kpi-label">Đã chi</div><div class="kpi-value bad money" id="fundSpent">0đ</div><div class="kpi-foot">Ăn uống, vui chơi, hoạt động chung</div></div>
+      </div>
+      <div class="section two-col">
+        <div class="card">
+          <div class="section-head"><div><h3>Ghi giao dịch quỹ</h3><p>Dùng cho đóng góp thêm hoặc chi tiêu; tiền phạt được cộng tự động khi tick “đã nộp”.</p></div></div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>Loại giao dịch</label><select id="txType"><option value="contribution">Đóng góp thêm</option><option value="expense">Chi tiêu</option></select></div>
+            <div class="field"><label>Số tiền</label><input id="txAmount" type="number" min="0" step="1000" placeholder="100000" /></div>
+            <div class="field"><label>Ngày</label><input id="txDate" type="date" /></div>
+            <div class="field"><label>Người liên quan</label><select id="txMember"><option value="">— Nhóm —</option></select></div>
+            <div class="field span2"><label>Nội dung</label><input id="txNote" type="text" placeholder="Ví dụ: Ăn lẩu cuối tháng" /></div>
+            <div class="span2"><button class="btn btn-primary" id="btnAddTx">+ Thêm giao dịch</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-head"><div><h3>Nguyên tắc quỹ</h3><p>Thiết kế để hạn chế lệch số và tranh cãi</p></div></div>
+          <div class="rule"><b>Tiền phạt</b><span>Chỉ cộng vào quỹ sau khi được tích “Đã nộp”.</span></div>
+          <div class="rule" style="margin-top:8px"><b>Khoản chi</b><span>Phải có ngày + mô tả; có thể gắn thành viên hoặc để “Nhóm”.</span></div>
+          <div class="rule" style="margin-top:8px"><b>Số dư</b><span>= tiền phạt đã thu + đóng góp khác − tổng chi.</span></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-head"><div><h3>Sổ quỹ</h3><p>Tự động gộp tiền phạt đã nộp và giao dịch thủ công.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Người</th><th>Nội dung</th><th class="right">Số tiền</th><th></th></tr></thead><tbody id="ledgerBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="tab" id="settings">
+      <div class="settings-grid">
+        <div class="card">
+          <div class="section-head"><div><h3>Luật chương trình</h3><p>Có thể điều chỉnh mà không sửa code.</p></div></div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>Ngày bắt đầu</label><input id="setStartDate" type="date" /></div>
+            <div class="field"><label>Mốc điểm danh</label><input id="setCheckinTime" type="time" /></div>
+            <div class="field"><label>Grace period (phút)</label><input id="setGrace" type="number" min="0" max="60" /></div>
+            <div class="field"><label>Tối thiểu buổi/tuần</label><input id="setTarget" type="number" min="1" max="5" /></div>
+            <div class="field"><label>Tiền phạt / tuần / người</label><input id="setFine" type="number" min="0" step="10000" /></div>
+            <div class="field"><label>Đơn vị</label><input value="VND" disabled /></div>
+            <div class="span2 toggle"><input id="setExemptFirst" type="checkbox" /><label for="setExemptFirst">Miễn phạt tuần khởi động nếu số ngày hợp lệ còn lại ít hơn chỉ tiêu tuần</label></div>
+            <div class="span2"><button class="btn btn-primary" id="btnSaveSettings">Lưu cài đặt</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-head"><div><h3>Dữ liệu & backup</h3><p>Bản này lưu bằng LocalStorage nên nên backup định kỳ.</p></div></div>
+          <div class="actions"><button class="btn btn-secondary" id="btnExport">Xuất backup JSON</button><label class="btn btn-secondary" style="cursor:pointer">Nhập backup JSON<input id="importFile" type="file" accept="application/json" hidden></label><button class="btn btn-danger" id="btnReset">Xóa toàn bộ dữ liệu</button></div>
+          <div style="height:12px"></div>
+          <div class="callout"><strong>Lưu ý kỹ thuật:</strong> LocalStorage chỉ đồng bộ trên cùng một trình duyệt/thiết bị. Nếu cả Ánh, Hằng, Uyên cần tự điểm danh từ 3 điện thoại khác nhau, nên nâng cấp sang backend dùng Supabase/Firebase/Google Sheet API.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="footer">Về đích Bính Ngọ • dữ liệu thuộc về nhóm • build 2026</div>
+</div>
+<script>
+const STORAGE_KEY='ve_dich_binh_ngo_v1';
+const DEFAULT_STATE={
+  config:{projectName:'Về đích Bính Ngọ',startDate:'2026-10-01',checkinTime:'06:00',graceMinutes:5,targetPerWeek:3,fineAmount:50000,exemptShortFirstWeek:true,members:['Ánh','Hằng','Uyên']},
+  checkins:[], payments:{}, transactions:[]
+};
+let state=loadState();
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function loadState(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return clone(DEFAULT_STATE);const s=JSON.parse(raw);return {...clone(DEFAULT_STATE),...s,config:{...clone(DEFAULT_STATE).config,...(s.config||{})}}}catch(e){return clone(DEFAULT_STATE)}}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));renderAll()}
+const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
+function pad(n){return String(n).padStart(2,'0')}
+function localDateStr(d=new Date()){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12,0,0,0)}
+function fmtDate(s){const d=parseDate(s);return d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}
+function fmtShort(s){const d=parseDate(s);return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`}
+function money(n){return new Intl.NumberFormat('vi-VN').format(Math.round(n||0))+'đ'}
+function addDays(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDateStr(d)}
+function startOfWeek(s){const d=parseDate(s);const day=d.getDay();const diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return localDateStr(d)}
+function endOfWeek(s){return addDays(startOfWeek(s),6)}
+function minuteOf(t){const [h,m]=t.split(':').map(Number);return h*60+m}
+function deadlineMinutes(){return minuteOf(state.config.checkinTime)+Number(state.config.graceMinutes||0)}
+function isWeekday(s){const d=parseDate(s).getDay();return d>=1&&d<=5}
+function isProgramDay(s){return s>=state.config.startDate&&isWeekday(s)}
+function eligibleDaysInWeek(weekStart){return [0,1,2,3,4].map(i=>addDays(weekStart,i)).filter(isProgramDay)}
+function isFirstProgramWeek(weekStart){return weekStart===startOfWeek(state.config.startDate)}
+function isWeekExempt(weekStart){return !!state.config.exemptShortFirstWeek && isFirstProgramWeek(weekStart) && eligibleDaysInWeek(weekStart).length<state.config.targetPerWeek}
+function isWeekCompleted(weekStart, today=localDateStr()){return endOfWeek(weekStart)<today}
+function validCheckin(ci){return isProgramDay(ci.date)&&minuteOf(ci.time)<=deadlineMinutes()}
+function getWeekCheckins(member,weekStart){const end=endOfWeek(weekStart);return state.checkins.filter(c=>c.member===member&&c.date>=weekStart&&c.date<=end)}
+function memberWeek(member,weekStart){const arr=getWeekCheckins(member,weekStart);const valid=arr.filter(validCheckin).length;const late=arr.filter(c=>isProgramDay(c.date)&&!validCheckin(c)).length;const exempt=isWeekExempt(weekStart);const shortage=Math.max(0,state.config.targetPerWeek-valid);const completed=isWeekCompleted(weekStart);const fine=(!exempt&&completed&&shortage>0)?state.config.fineAmount:0;return {valid,late,shortage,exempt,completed,fine}}
+function paymentKey(weekStart,member){return `${weekStart}__${member}`}
+function allCompletedWeekStarts(){const today=localDateStr();let w=startOfWeek(state.config.startDate);const out=[];let guard=0;while(endOfWeek(w)<today&&guard<520){out.push(w);w=addDays(w,7);guard++}return out}
+function allFines(){const rows=[];for(const w of allCompletedWeekStarts()){for(const m of state.config.members){const st=memberWeek(m,w);if(st.fine>0){const key=paymentKey(w,m);rows.push({weekStart:w,member:m,amount:st.fine,paid:!!state.payments[key]?.paid,paidAt:state.payments[key]?.paidAt||null,key})}}}return rows}
+function finance(){const fines=allFines();const finePaid=fines.filter(x=>x.paid).reduce((s,x)=>s+x.amount,0);const receivable=fines.filter(x=>!x.paid).reduce((s,x)=>s+x.amount,0);const contrib=state.transactions.filter(t=>t.type==='contribution').reduce((s,t)=>s+Number(t.amount||0),0);const spent=state.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount||0),0);return {finePaid,receivable,contrib,spent,balance:finePaid+contrib-spent}}
+function currentWeek(){return startOfWeek(localDateStr())}
+function setTodayInputs(){const now=new Date();$('#ciDate').value=localDateStr(now);$('#ciTime').value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;$('#txDate').value=localDateStr(now);$('#reportDate').value=localDateStr(now)}
+
+function renderHeader(){const now=new Date();$('#liveTime').textContent=now.toLocaleTimeString('vi-VN',{hour12:false});$('#liveDate').textContent=now.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});const today=localDateStr(now);const n=$('#preStartNotice');if(today<state.config.startDate){const diff=Math.ceil((parseDate(state.config.startDate)-parseDate(today))/86400000);n.className='notice show';n.innerHTML=`Chương trình chưa bắt đầu. Còn <b>${diff} ngày</b> tới ${fmtDate(state.config.startDate)}.`}else{n.className='notice'}}
+function renderMemberSelects(){const opts=state.config.members.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');$('#ciMember').innerHTML=opts;$('#txMember').innerHTML='<option value="">— Nhóm —</option>'+opts}
+function renderOverview(){
+  const f=finance();$('#kpiFund').textContent=money(f.balance);$('#kpiReceivable').textContent=money(f.receivable);$('#kpiReceivableFoot').textContent=`${allFines().filter(x=>!x.paid).length} khoản chưa nộp`;
+  const w=currentWeek(),stats=state.config.members.map(m=>({m,...memberWeek(m,w)}));const hit=stats.filter(x=>x.valid>=state.config.targetPerWeek).length;const total=stats.reduce((s,x)=>s+x.valid,0);$('#kpiHitRate').textContent=Math.round(hit/state.config.members.length*100)+'%';$('#kpiHitRateFoot').textContent=`${hit}/${state.config.members.length} thành viên đang đạt`;$('#kpiSessions').textContent=total;$('#currentWeekLabel').textContent=`${fmtDate(w)} → ${fmtDate(endOfWeek(w))}`;
+  const exempt=isWeekExempt(w);$('#weekStateBadge').textContent=exempt?'Tuần khởi động • miễn phạt':(isWeekCompleted(w)?'Đã chốt':'Đang theo dõi');$('#weekStateBadge').className='badge '+(exempt?'neutral':'neutral');
+  $('#memberCards').innerHTML=stats.map(x=>{const pct=Math.min(100,Math.round(x.valid/state.config.targetPerWeek*100));const status=x.valid>=state.config.targetPerWeek?'Đã đạt':`${x.valid}/${state.config.targetPerWeek} buổi`;return `<div class="card member"><div class="member-top"><div style="display:flex;align-items:center;gap:10px"><div class="avatar">${esc(x.m.charAt(0))}</div><div><b>${esc(x.m)}</b><div class="mini">${x.late} buổi muộn</div></div></div><span class="status-pill">${status}</span></div><div class="progress"><span style="width:${pct}%"></span></div><div class="member-stats"><span>${x.valid} buổi hợp lệ</span><span>${pct}%</span></div></div>`}).join('');
+  renderHeatmap(w);
+}
+function renderHeatmap(w){const days=[0,1,2,3,4].map(i=>addDays(w,i));let html='<div></div>'+days.map(d=>`<div class="head">${['CN','T2','T3','T4','T5','T6','T7'][parseDate(d).getDay()]}<br>${fmtShort(d)}</div>`).join('');for(const m of state.config.members){html+=`<div class="label">${esc(m)}</div>`;for(const d of days){const ci=state.checkins.find(c=>c.member===m&&c.date===d);let cls='cell',txt='—';if(ci){cls+=' '+(validCheckin(ci)?'on':'late');txt=ci.time}if(d<state.config.startDate){txt='·'}html+=`<div class="${cls}">${txt}</div>`}}$('#heatmap').innerHTML=html}
+function renderCheckins(){const rows=[...state.checkins].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));$('#checkinHistory').innerHTML=rows.length?rows.map(c=>`<tr><td>${fmtDate(c.date)}</td><td><b>${esc(c.member)}</b></td><td>${esc(c.time)}</td><td>${validCheckin(c)?'<span class="badge ok">Đúng giờ</span>':'<span class="badge fail">Muộn / không hợp lệ</span>'}</td><td>${esc(c.note||'—')}</td><td>${c.proof?`<a href="${attr(c.proof)}" target="_blank" style="color:#8dc5ff">Mở link</a>`:'—'}</td><td><button class="btn btn-danger" style="padding:6px 9px" onclick="deleteCheckin('${c.id}')">Xóa</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty">Chưa có lượt điểm danh nào.</td></tr>`}
+function renderWeekly(){const selected=$('#reportDate').value||localDateStr();const w=startOfWeek(selected),end=endOfWeek(w);const exempt=isWeekExempt(w),completed=isWeekCompleted(w);const elig=eligibleDaysInWeek(w).length;$('#weekReportMeta').innerHTML=`Tuần <strong>${fmtDate(w)} → ${fmtDate(end)}</strong> • ${elig} ngày chương trình hợp lệ • ${exempt?'<strong>Tuần khởi động: miễn phạt</strong>':completed?'Đã kết thúc — có thể chốt phạt':'Đang diễn ra — tiền phạt mới chỉ là dự báo'}`;
+  $('#weeklyBody').innerHTML=state.config.members.map(m=>{const st=memberWeek(m,w);const key=paymentKey(w,m);const paid=!!state.payments[key]?.paid;const shouldFine=st.fine>0;const displayFine=shouldFine?st.fine:(!st.exempt&&!st.completed&&st.shortage>0?state.config.fineAmount:0);const status=st.exempt?'<span class="badge neutral">Miễn phạt</span>':st.valid>=state.config.targetPerWeek?'<span class="badge ok">Đạt</span>':st.completed?'<span class="badge fail">Thiếu buổi</span>':'<span class="badge neutral">Đang chạy</span>';return `<tr class="${st.completed&&st.shortage>0&&!st.exempt?'alert-row':''}"><td><b>${esc(m)}</b></td><td>${st.valid}</td><td>${st.late}</td><td>${state.config.targetPerWeek}</td><td>${st.shortage}</td><td class="money ${displayFine?'bad':''}">${displayFine?money(displayFine):'0đ'}${!st.completed&&displayFine?'<div class="mini">dự báo</div>':''}</td><td>${shouldFine?`<input class="checkbox" type="checkbox" ${paid?'checked':''} onchange="togglePayment('${w}','${jsq(m)}',this.checked)">`:'—'}</td><td>${status}</td></tr>`}).join('')}
+function renderFund(){const f=finance();$('#fundBalance').textContent=money(f.balance);$('#fundFinePaid').textContent=money(f.finePaid);$('#fundContrib').textContent=money(f.contrib);$('#fundSpent').textContent=money(f.spent);const ledger=[];for(const x of allFines().filter(x=>x.paid)){ledger.push({id:'fine:'+x.key,date:x.paidAt?x.paidAt.slice(0,10):endOfWeek(x.weekStart),type:'fine',member:x.member,note:`Phạt tuần ${fmtShort(x.weekStart)}–${fmtShort(endOfWeek(x.weekStart))}`,amount:x.amount,auto:true})}for(const t of state.transactions)ledger.push({...t,auto:false});ledger.sort((a,b)=>(b.date+(b.createdAt||'')).localeCompare(a.date+(a.createdAt||'')));$('#ledgerBody').innerHTML=ledger.length?ledger.map(x=>{const inc=x.type!=='expense';const type=x.type==='fine'?'Tiền phạt':x.type==='contribution'?'Đóng góp':'Chi tiêu';return `<tr><td>${fmtDate(x.date)}</td><td>${type}</td><td>${esc(x.member||'Nhóm')}</td><td>${esc(x.note||'—')}</td><td class="right money ${inc?'ledger-positive':'ledger-negative'}">${inc?'+':'−'}${money(Math.abs(Number(x.amount||0)))}</td><td>${x.auto?'':'<button class="btn btn-danger" style="padding:6px 9px" onclick="deleteTx(\''+x.id+'\')">Xóa</button>'}</td></tr>`}).join(''):`<tr><td colspan="6" class="empty">Chưa có giao dịch quỹ.</td></tr>`}
+function renderSettings(){const c=state.config;$('#setStartDate').value=c.startDate;$('#setCheckinTime').value=c.checkinTime;$('#setGrace').value=c.graceMinutes;$('#setTarget').value=c.targetPerWeek;$('#setFine').value=c.fineAmount;$('#setExemptFirst').checked=!!c.exemptShortFirstWeek;$('#deadlineBadge').textContent=`Deadline ${minutesToTime(deadlineMinutes())}`}
+function renderAll(){renderHeader();renderMemberSelects();renderOverview();renderCheckins();renderWeekly();renderFund();renderSettings()}
+function minutesToTime(n){return `${pad(Math.floor(n/60)%24)}:${pad(n%60)}`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function attr(s){return esc(s).replace(/`/g,'')}
+function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+
+function saveCheckin(){const member=$('#ciMember').value,date=$('#ciDate').value,time=$('#ciTime').value,note=$('#ciNote').value.trim(),proof=$('#ciProof').value.trim();if(!member||!date||!time)return alert('Vui lòng chọn thành viên, ngày và giờ điểm danh.');if(!isWeekday(date))return alert('Thứ 7, Chủ Nhật không tính điểm danh theo luật chương trình.');if(date<state.config.startDate)return alert('Ngày này nằm trước ngày bắt đầu chương trình.');const existing=state.checkins.find(c=>c.member===member&&c.date===date);if(existing){if(!confirm(`${member} đã có điểm danh ngày ${fmtDate(date)}. Ghi đè bản ghi cũ?`))return;Object.assign(existing,{time,note,proof,updatedAt:new Date().toISOString()})}else{state.checkins.push({id:crypto.randomUUID?crypto.randomUUID():'ci_'+Date.now(),member,date,time,note,proof,createdAt:new Date().toISOString()})}save();$('#ciNote').value='';$('#ciProof').value='';alert(validCheckin({member,date,time})?'Đã lưu điểm danh hợp lệ.':'Đã lưu, nhưng lượt này muộn hơn deadline nên không được tính vào chỉ tiêu tuần.')}
+window.deleteCheckin=id=>{if(confirm('Xóa lượt điểm danh này?')){state.checkins=state.checkins.filter(c=>c.id!==id);save()}}
+window.togglePayment=(w,m,checked)=>{const key=paymentKey(w,m);state.payments[key]={paid:checked,paidAt:checked?new Date().toISOString():null};save()}
+function addTx(){const type=$('#txType').value,amount=Number($('#txAmount').value),date=$('#txDate').value,member=$('#txMember').value,note=$('#txNote').value.trim();if(!amount||amount<=0||!date)return alert('Vui lòng nhập số tiền > 0 và ngày giao dịch.');state.transactions.push({id:crypto.randomUUID?crypto.randomUUID():'tx_'+Date.now(),type,amount,date,member,note,createdAt:new Date().toISOString()});save();$('#txAmount').value='';$('#txNote').value=''}
+window.deleteTx=id=>{if(confirm('Xóa giao dịch này?')){state.transactions=state.transactions.filter(t=>t.id!==id);save()}}
+function saveSettings(){const startDate=$('#setStartDate').value,checkinTime=$('#setCheckinTime').value,graceMinutes=Number($('#setGrace').value),targetPerWeek=Number($('#setTarget').value),fineAmount=Number($('#setFine').value);if(!startDate||!checkinTime||targetPerWeek<1||targetPerWeek>5||fineAmount<0||graceMinutes<0)return alert('Cài đặt chưa hợp lệ.');state.config={...state.config,startDate,checkinTime,graceMinutes,targetPerWeek,fineAmount,exemptShortFirstWeek:$('#setExemptFirst').checked};save();alert('Đã lưu cài đặt.')}
+function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ve-dich-binh-ngo-backup-${localDateStr()}.json`;a.click();URL.revokeObjectURL(url)}
+function importData(file){const r=new FileReader();r.onload=()=>{try{const incoming=JSON.parse(r.result);if(!incoming.config||!Array.isArray(incoming.checkins))throw new Error('invalid');if(!confirm('Nhập backup sẽ thay thế dữ liệu hiện tại. Tiếp tục?'))return;state={...clone(DEFAULT_STATE),...incoming,config:{...clone(DEFAULT_STATE).config,...incoming.config}};save();alert('Đã nhập dữ liệu backup.')}catch(e){alert('File backup không hợp lệ.')}};r.readAsText(file)}
+
+$$('.tab-btn').forEach(b=>b.addEventListener('click',()=>{$$('.tab-btn').forEach(x=>x.classList.remove('active'));$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#'+b.dataset.tab).classList.add('active');if(b.dataset.tab==='weekly')renderWeekly()}));
+$('#btnCheckin').addEventListener('click',saveCheckin);$('#btnNow').addEventListener('click',()=>{const n=new Date();$('#ciDate').value=localDateStr(n);$('#ciTime').value=`${pad(n.getHours())}:${pad(n.getMinutes())}`});$('#reportDate').addEventListener('change',renderWeekly);$('#btnAddTx').addEventListener('click',addTx);$('#btnSaveSettings').addEventListener('click',saveSettings);$('#btnExport').addEventListener('click',exportData);$('#importFile').addEventListener('change',e=>e.target.files[0]&&importData(e.target.files[0]));$('#btnReset').addEventListener('click',()=>{if(confirm('Xóa TOÀN BỘ dữ liệu điểm danh, tiền phạt và quỹ?')){localStorage.removeItem(STORAGE_KEY);state=clone(DEFAULT_STATE);setTodayInputs();save()}});
+setTodayInputs();renderAll();setInterval(renderHeader,1000);
+</script>
+</body>
+</html>
