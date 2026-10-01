@@ -168,7 +168,7 @@ button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;pa
 </div>
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwPdsx1G1BqPJOuOvHhW6M34rOQR9-NzW3T_1KyGYf4lX2rUfd546vbsbCsf37Nz1cFCg/exec';
-const API_TOKEN = '011026';
+const API_TOKEN = '011026.gs';
 const MEMBERS = ['Ánh', 'Hằng', 'Uyên'];
 
 const DEFAULT_SETTINGS = {
@@ -241,17 +241,93 @@ function boolValue(v) {
   return v === true || v === 1 || String(v).toLowerCase() === 'true';
 }
 
+// Google Sheets có thể tự động biến chuỗi ngày/giờ thành Date object.
+// Khi Apps Script trả dữ liệu qua JSON, 01/10 00:00 GMT+7 có thể thành
+// 30/09 17:00Z; time-only có thể mang mốc 30/12/1899. Chuẩn hoá lại
+// về đúng múi giờ Việt Nam trước khi đưa vào nghiệp vụ dashboard.
+const APP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+function dateInAppTz(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(d);
+  const obj = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${obj.year}-${obj.month}-${obj.day}`;
+}
+
+function timeInAppTz(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: APP_TIME_ZONE,
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(d);
+}
+
+function normalizeDateValue(v) {
+  if (v === undefined || v === null || v === '') return '';
+  const s = String(v).trim();
+
+  // Chuẩn API mong muốn.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Trường hợp getDisplayValues() trả dd/MM/yyyy hoặc dd-MM-yyyy.
+  let m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+
+  // ISO / Date string từ Apps Script: chuyển absolute time về Asia/Ho_Chi_Minh.
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return dateInAppTz(d);
+
+  return s;
+}
+
+function normalizeTimeValue(v) {
+  if (v === undefined || v === null || v === '') return '';
+  const s = String(v).trim();
+
+  // Chuỗi giờ đúng chuẩn.
+  let m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (m) return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+
+  // ISO timestamp (đặc biệt time-only của Sheets thường bị neo ở năm 1899).
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return timeInAppTz(d);
+  }
+
+  // Date.toString() từ Apps Script thường vẫn chứa đúng clock time,
+  // ví dụ: Sat Dec 30 1899 06:29:00 GMT+0642 (...)
+  m = s.match(/\b([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?\b/);
+  if (m) return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return timeInAppTz(d);
+  return s;
+}
+
 function hydrate(d = {}) {
-  state.checkins = Array.isArray(d.checkins) ? d.checkins.map(c => ({ ...c })) : [];
+  state.checkins = Array.isArray(d.checkins)
+    ? d.checkins.map(c => ({
+        ...c,
+        date: normalizeDateValue(c.date),
+        time: normalizeTimeValue(c.time)
+      }))
+    : [];
   state.transactions = Array.isArray(d.transactions)
-    ? d.transactions.map(t => ({ ...t, amount: Number(t.amount || 0) }))
+    ? d.transactions.map(t => ({
+        ...t,
+        amount: Number(t.amount || 0),
+        date: normalizeDateValue(t.date)
+      }))
     : [];
 
   state.fines = {};
   (Array.isArray(d.fines) ? d.fines : []).forEach(f => {
     const member = f.member || '';
-    const weekStart = f.weekStart || '';
-    const key = f.key || `${member}|${weekStart}`;
+    const weekStart = normalizeDateValue(f.weekStart || '');
+    const key = `${member}|${weekStart}`;
     state.fines[key] = {
       ...f,
       key,
@@ -273,6 +349,9 @@ function hydrate(d = {}) {
   if (s.checkinTime !== undefined && s.deadline === DEFAULT_SETTINGS.deadline) s.deadline = s.checkinTime;
   if (s.graceMinutes !== undefined && s.grace === DEFAULT_SETTINGS.grace) s.grace = Number(s.graceMinutes);
   if (s.targetPerWeek !== undefined && s.minPerWeek === DEFAULT_SETTINGS.minPerWeek) s.minPerWeek = Number(s.targetPerWeek);
+
+  s.startDate = normalizeDateValue(s.startDate) || DEFAULT_SETTINGS.startDate;
+  s.deadline = normalizeTimeValue(s.deadline) || DEFAULT_SETTINGS.deadline;
   if (s.exemptShortFirstWeek !== undefined && s.waiveFirstWeek === DEFAULT_SETTINGS.waiveFirstWeek) s.waiveFirstWeek = boolValue(s.exemptShortFirstWeek);
 
   s.grace = Number(s.grace || 0);
@@ -456,14 +535,31 @@ function startAutoSync(intervalMs = 30000) {
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function localDateStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-function parseDate(s) { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d, 12, 0, 0, 0); }
-function fmtDate(s) { const d = parseDate(s); return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }); }
-function fmtShort(s) { const d = parseDate(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; }
+function parseDate(s) {
+  const v = normalizeDateValue(s);
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return new Date(NaN);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+}
+function fmtDate(s) {
+  const d = parseDate(s);
+  return Number.isNaN(d.getTime()) ? 'Ngày không hợp lệ' : d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function fmtShort(s) {
+  const d = parseDate(s);
+  return Number.isNaN(d.getTime()) ? '—' : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+}
 function money(n) { return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + (state.settings.unit || 'đ'); }
-function addDays(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return localDateStr(d); }
-function startOfWeek(s) { const d = parseDate(s); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate() + diff); return localDateStr(d); }
+function addDays(s, n) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; d.setDate(d.getDate() + n); return localDateStr(d); }
+function startOfWeek(s) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate() + diff); return localDateStr(d); }
 function endOfWeek(s) { return addDays(startOfWeek(s), 6); }
-function minuteOf(t) { const [h, m] = String(t).slice(0, 5).split(':').map(Number); return h * 60 + m; }
+function minuteOf(t) {
+  const v = normalizeTimeValue(t);
+  const m = v.match(/^(\d{2}):(\d{2})$/);
+  if (!m) return NaN;
+  const h = Number(m[1]), min = Number(m[2]);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59 ? h * 60 + min : NaN;
+}
 function deadlineMinutes() { return minuteOf(state.settings.deadline) + Number(state.settings.grace || 0); }
 function isWeekday(s) { const d = parseDate(s).getDay(); return d >= 1 && d <= 5; }
 function isProgramDay(s) { return s >= state.settings.startDate && isWeekday(s); }
