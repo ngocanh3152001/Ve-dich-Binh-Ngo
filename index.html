@@ -168,7 +168,7 @@ button,input,select,textarea{font:inherit}.app{max-width:1440px;margin:0 auto;pa
 </div>
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwPdsx1G1BqPJOuOvHhW6M34rOQR9-NzW3T_1KyGYf4lX2rUfd546vbsbCsf37Nz1cFCg/exec';
-const API_TOKEN = '011026.gs';
+const API_TOKEN = '011026'; // PHẢI trùng hệt TOKEN trong Apps Script
 const MEMBERS = ['Ánh', 'Hằng', 'Uyên'];
 
 const DEFAULT_SETTINGS = {
@@ -189,6 +189,7 @@ let state = {
 };
 
 let pendingWrites = 0;
+let writeSeq = 0; // tăng mỗi khi có thao tác ghi → bỏ qua kết quả GET cũ (chống ghi đè dữ liệu mới bằng dữ liệu cũ)
 let lastSyncAt = null;
 
 const $ = s => document.querySelector(s);
@@ -212,7 +213,11 @@ function setSyncStatus(status, detail = '') {
 }
 
 async function apiGetAll() {
-  const res = await fetch(`${API_URL}?token=${encodeURIComponent(API_TOKEN)}&t=${Date.now()}`);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  let res;
+  try { res = await fetch(`${API_URL}?token=${encodeURIComponent(API_TOKEN)}&t=${Date.now()}`, { signal: ctl.signal, cache: 'no-store' }); }
+  finally { clearTimeout(timer); }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Lỗi tải dữ liệu');
@@ -221,7 +226,7 @@ async function apiGetAll() {
 
 // text/plain để trình duyệt không gửi CORS preflight OPTIONS tới Apps Script.
 async function apiPost(action, payload = {}) {
-  pendingWrites++;
+  pendingWrites++; writeSeq++;
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
@@ -233,7 +238,7 @@ async function apiPost(action, payload = {}) {
     if (!data.ok) throw new Error(data.error || 'Lỗi ghi dữ liệu');
     return data;
   } finally {
-    pendingWrites--;
+    pendingWrites--; writeSeq++;
   }
 }
 
@@ -368,9 +373,12 @@ function isFormEditing() {
 
 async function loadState(silent = false) {
   if (silent && (pendingWrites > 0 || isFormEditing())) return;
+  const seq = writeSeq;
   try {
     if (!silent) setSyncStatus('loading');
-    hydrate(await apiGetAll());
+    const data = await apiGetAll();
+    if (seq !== writeSeq || pendingWrites > 0) return; // có lượt ghi xảy ra trong lúc tải → dữ liệu này đã cũ
+    hydrate(data);
     lastSyncAt = new Date();
     renderAll();
     setSyncStatus('ok');
@@ -399,28 +407,22 @@ async function addCheckin({ member, date, time, proof = '', note = '' }) {
   }
 }
 
-// Apps Script hiện chưa có action updateCheckin, nên thay bản ghi theo cách add mới -> xóa cũ.
-// Nếu bước xóa cũ lỗi, hệ thống cố rollback bản ghi mới để tránh tạo trùng.
+// Ghi đè an toàn: giữ nguyên id, server upsert theo id (1 request duy nhất, không thể tạo trùng).
 async function replaceCheckin(existing, fields) {
-  const rec = { id: uid(), ...fields, createdAt: new Date().toISOString() };
+  const rec = { id: existing.id, ...fields, createdAt: new Date().toISOString() };
+  const backup = [...state.checkins];
+  state.checkins = state.checkins.map(c => c.id === rec.id ? rec : c);
+  renderAll();
   try {
-    await apiPost('addCheckin', { data: rec });
-    try {
-      await apiPost('deleteCheckin', { id: existing.id });
-    } catch (deleteErr) {
-      try { await apiPost('deleteCheckin', { id: rec.id }); } catch (_) {}
-      throw deleteErr;
-    }
-    state.checkins = state.checkins.filter(c => c.id !== existing.id);
-    state.checkins.push(rec);
+    await apiPost('saveCheckin', { data: rec });
     lastSyncAt = new Date();
-    renderAll();
     setSyncStatus('ok');
     return rec;
   } catch (err) {
-    await loadState(true);
+    state.checkins = backup;
+    renderAll();
     setSyncStatus('error');
-    alert('Không thể cập nhật lượt điểm danh. Dữ liệu đã được đồng bộ lại.\n' + err.message);
+    alert('Không thể cập nhật lượt điểm danh.\n' + err.message);
     throw err;
   }
 }
@@ -534,24 +536,25 @@ function startAutoSync(intervalMs = 30000) {
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
-function localDateStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function localDateStr(d = new Date()) { return dateInAppTz(d); } // chỉ dùng cho thời điểm thực (now) theo giờ VN
+function ymd(d) { return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
 function parseDate(s) {
   const v = normalizeDateValue(s);
   const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return new Date(NaN);
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12));
 }
 function fmtDate(s) {
   const d = parseDate(s);
-  return Number.isNaN(d.getTime()) ? 'Ngày không hợp lệ' : d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? 'Ngày không hợp lệ' : d.toLocaleDateString('vi-VN', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function fmtShort(s) {
   const d = parseDate(s);
-  return Number.isNaN(d.getTime()) ? '—' : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  return Number.isNaN(d.getTime()) ? '—' : `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}`;
 }
 function money(n) { return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + (state.settings.unit || 'đ'); }
-function addDays(s, n) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; d.setDate(d.getDate() + n); return localDateStr(d); }
-function startOfWeek(s) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate() + diff); return localDateStr(d); }
+function addDays(s, n) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; d.setUTCDate(d.getUTCDate() + n); return ymd(d); }
+function startOfWeek(s) { const d = parseDate(s); if (Number.isNaN(d.getTime())) return ''; const day = d.getUTCDay(); const diff = day === 0 ? -6 : 1 - day; d.setUTCDate(d.getUTCDate() + diff); return ymd(d); }
 function endOfWeek(s) { return addDays(startOfWeek(s), 6); }
 function minuteOf(t) {
   const v = normalizeTimeValue(t);
@@ -561,7 +564,7 @@ function minuteOf(t) {
   return h >= 0 && h <= 23 && min >= 0 && min <= 59 ? h * 60 + min : NaN;
 }
 function deadlineMinutes() { return minuteOf(state.settings.deadline) + Number(state.settings.grace || 0); }
-function isWeekday(s) { const d = parseDate(s).getDay(); return d >= 1 && d <= 5; }
+function isWeekday(s) { const d = parseDate(s).getUTCDay(); return d >= 1 && d <= 5; }
 function isProgramDay(s) { return s >= state.settings.startDate && isWeekday(s); }
 function eligibleDaysInWeek(weekStart) { return [0, 1, 2, 3, 4].map(i => addDays(weekStart, i)).filter(isProgramDay); }
 function isFirstProgramWeek(weekStart) { return weekStart === startOfWeek(state.settings.startDate); }
@@ -613,15 +616,15 @@ function currentWeek() { return startOfWeek(localDateStr()); }
 function setTodayInputs() {
   const now = new Date();
   $('#ciDate').value = localDateStr(now);
-  $('#ciTime').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  $('#ciTime').value = timeInAppTz(now);
   $('#txDate').value = localDateStr(now);
   $('#reportDate').value = localDateStr(now);
 }
 
 function renderHeader() {
   const now = new Date();
-  $('#liveTime').textContent = now.toLocaleTimeString('vi-VN', { hour12: false });
-  $('#liveDate').textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  $('#liveTime').textContent = now.toLocaleTimeString('vi-VN', { timeZone: APP_TIME_ZONE, hour12: false });
+  $('#liveDate').textContent = now.toLocaleDateString('vi-VN', { timeZone: APP_TIME_ZONE, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
   const today = localDateStr(now);
   const n = $('#preStartNotice');
   if (today < state.settings.startDate) {
@@ -667,7 +670,7 @@ function renderOverview() {
 
 function renderHeatmap(w) {
   const days = [0, 1, 2, 3, 4].map(i => addDays(w, i));
-  let html = '<div></div>' + days.map(d => `<div class="head">${['CN','T2','T3','T4','T5','T6','T7'][parseDate(d).getDay()]}<br>${fmtShort(d)}</div>`).join('');
+  let html = '<div></div>' + days.map(d => `<div class="head">${['CN','T2','T3','T4','T5','T6','T7'][parseDate(d).getUTCDay()]}<br>${fmtShort(d)}</div>`).join('');
   for (const m of MEMBERS) {
     html += `<div class="label">${esc(m)}</div>`;
     for (const d of days) {
@@ -710,7 +713,7 @@ function renderFund() {
   $('#fundSpent').textContent = money(f.spent);
   const ledger = [];
   for (const x of allFines().filter(x => x.paid)) {
-    ledger.push({ id: 'fine:' + x.key, date: x.paidAt ? x.paidAt.slice(0, 10) : endOfWeek(x.weekStart), type: 'fine', member: x.member, note: `Phạt tuần ${fmtShort(x.weekStart)}–${fmtShort(endOfWeek(x.weekStart))}`, amount: x.amount, auto: true });
+    ledger.push({ id: 'fine:' + x.key, date: (x.paidAt && normalizeDateValue(x.paidAt)) || endOfWeek(x.weekStart), type: 'fine', member: x.member, note: `Phạt tuần ${fmtShort(x.weekStart)}–${fmtShort(endOfWeek(x.weekStart))}`, amount: x.amount, auto: true });
   }
   for (const t of state.transactions) ledger.push({ ...t, auto: false });
   ledger.sort((a, b) => (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || '')));
@@ -747,7 +750,16 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;'
 function attr(s) { return esc(s).replace(/`/g, ''); }
 function jsq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
+let savingCheckin = false;
 async function handleSaveCheckin() {
+  if (savingCheckin) return;
+  savingCheckin = true;
+  const btn = $('#btnCheckin');
+  btn.disabled = true;
+  try { await doSaveCheckin(); } finally { savingCheckin = false; btn.disabled = false; }
+}
+
+async function doSaveCheckin() {
   const member = $('#ciMember').value;
   const date = $('#ciDate').value;
   const time = $('#ciTime').value;
@@ -829,7 +841,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btnNow').addEventListener('click', () => {
     const n = new Date();
     $('#ciDate').value = localDateStr(n);
-    $('#ciTime').value = `${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    $('#ciTime').value = timeInAppTz(n);
   });
   $('#reportDate').addEventListener('change', renderWeekly);
   $('#btnAddTx').addEventListener('click', handleAddTransaction);
